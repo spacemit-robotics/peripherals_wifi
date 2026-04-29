@@ -1,0 +1,23 @@
+SpacemiT peripherals/wifi Component
+Copyright 2026 SpacemiT (Hangzhou) Technology Co. Ltd.
+
+This product includes software developed at
+SpacemiT (Hangzhou) Technology Co. Ltd. (https://www.spacemit.com/).
+
+---------------------------------------------------------------------------
+Third-party Software Notices:
+---------------------------------------------------------------------------
+
+This product depends on the following third-party software:
+
+1. NetworkManager / nmcli (https://networkmanager.dev/)
+   Copyright (c) 2004-2024 Red Hat, Inc. and contributors
+   Licensed under the GPL-2.0-or-later License.
+
+
+---------------------------------------------------------------------------
+Additional Attributions:
+---------------------------------------------------------------------------
+
+This product uses components of the ROS 2 project (https://www.ros.org/).
+Copyright (c) 2014-2026 Open Source Robotics Foundation, Inc.
