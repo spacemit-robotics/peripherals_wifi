@@ -3,6 +3,7 @@
   <name>wifi</name>
   <version>0.1.0</version>
   <description>wifi interface depends on network-manager</description>
+  <system_depend check="pkg-config --exists libssl">libssl-dev</system_depend>
 
   <export>
     <build_type>cmake</build_type>
