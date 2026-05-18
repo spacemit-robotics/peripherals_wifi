@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(wifi LANGUAGES C)
 
+if(NOT DEFINED SROBOTIS_EXPORT_SET)
+    set(SROBOTIS_EXPORT_SET "ComponentsTargets" CACHE STRING "Export set name used by exported targets")
+endif()
+
 # Set C standard
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
