@@ -45,10 +45,10 @@ install(FILES include/wifi.h
     DESTINATION include
 )
 
-option(BUILD_TESTS "Build test programs" OFF)
+option(BUILD_TESTS "Build example programs" OFF)
 
 if(BUILD_TESTS)
-    add_executable(test_wifi_demo test/test_wifi_demo.c)
+    add_executable(test_wifi_demo example/test_wifi_demo.c)
     target_link_libraries(test_wifi_demo wifi)
     set_target_properties(test_wifi_demo PROPERTIES BUILD_RPATH "$ORIGIN/../lib")
     install(TARGETS test_wifi_demo RUNTIME DESTINATION bin)

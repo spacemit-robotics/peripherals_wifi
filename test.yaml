@@ -1,0 +1,36 @@
+## Copyright (C) 2026 SpacemiT (Hangzhou) Technology Co. Ltd.
+## SPDX-License-Identifier: Apache-2.0
+
+module: components/peripherals/wifi
+
+tests:
+  - name: wifi-api-functional
+    description: Verifies WiFi init, on/off, scan parsing, station info, saved networks, AP config, and MAC APIs with fake nmcli.
+    category: functional
+    scopes: [pr, scheduled]
+    timeout_s: 120
+    workdir: sdk
+    command: |
+      bash components/peripherals/wifi/tests/test_wifi_api_contract.sh functional
+
+  - name: wifi-api-error-paths
+    description: Verifies not-ready state, null arguments, invalid AP config, scan filters, and MAC argument validation.
+    category: functional
+    scopes: [pr, scheduled]
+    timeout_s: 120
+    workdir: sdk
+    command: |
+      bash components/peripherals/wifi/tests/test_wifi_api_contract.sh error-paths
+
+  - name: wifi-hardware-smoke
+    description: Manually verifies NetworkManager can enable WiFi and return real scan results.
+    category: functional
+    scopes: [manual]
+    timeout_s: 180
+    workdir: sdk
+    requires:
+      hardware:
+        - WiFi device managed by NetworkManager with nmcli available.
+      supervision: true
+    command: |
+      bash components/peripherals/wifi/tests/test_hw_wifi_smoke.sh
