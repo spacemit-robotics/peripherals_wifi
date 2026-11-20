@@ -58,14 +58,14 @@ static void wifi_emit_msg(struct wifi_msg_data *msg)
 }
 
 #ifdef WIFI_DEBUG
-static void debug_print_nmcli(char *const argv[])
+static void debug_print_command(char *const argv[])
 {
     int i = 0;
 
     if (!argv || !argv[0])
         return;
 
-    fprintf(stderr, "[WIFI] nmcli cmd:");
+    fprintf(stderr, "[WIFI] command:");
     while (argv[i]) {
         fprintf(stderr, " %s", argv[i]);
         i++;
@@ -119,7 +119,7 @@ static void rstrip(char *s)
     }
 }
 
-static int run_nmcli(char *const argv[], char **output)
+static int run_command(char *const argv[], char **output)
 {
     int pipefd[2];
     pid_t pid;
@@ -127,7 +127,7 @@ static int run_nmcli(char *const argv[], char **output)
     char *out_buf = NULL;
 
 #ifdef WIFI_DEBUG
-    debug_print_nmcli(argv);
+    debug_print_command(argv);
 #endif
 
     if (pipe(pipefd) != 0)
@@ -145,7 +145,7 @@ static int run_nmcli(char *const argv[], char **output)
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[0]);
         close(pipefd[1]);
-        execvp("nmcli", argv);
+        execvp(argv[0], argv);
         _exit(127);
     }
 
@@ -170,6 +170,11 @@ static int run_nmcli(char *const argv[], char **output)
     if (WIFEXITED(status))
         return WEXITSTATUS(status);
     return -1;
+}
+
+static int run_nmcli(char *const argv[], char **output)
+{
+    return run_command(argv, output);
 }
 
 static int split_fields(char *line, char sep, char **fields, int max_fields)
@@ -236,6 +241,52 @@ static void format_mac(const uint8_t *mac, char *buf, size_t buf_sz)
         return;
     snprintf(buf, buf_sz, "%02x:%02x:%02x:%02x:%02x:%02x",
         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+/* Read only dBm values tied to the requested BSSID. NetworkManager SIGNAL is
+ * a percentage and cannot be used as RSSI. Zero denotes an unavailable value.
+ */
+static int iw_parse_signal(const char *output, const uint8_t *bssid, bool link)
+{
+    const char *line = output;
+    const char *prefix = link ? "Connected to " : "BSS ";
+    bool matched = false;
+
+    while (line && *line) {
+        if (strncmp(line, prefix, strlen(prefix)) == 0) {
+            char address[18];
+            uint8_t current[6];
+
+            matched = sscanf(line + strlen(prefix), "%17s", address) == 1 &&
+                parse_mac(address, current) && memcmp(current, bssid, 6) == 0;
+        } else if (matched) {
+            const char *field = line;
+            double dbm;
+            char unit[4];
+
+            while (*field == ' ' || *field == '\t')
+                field++;
+            if (sscanf(field, "signal: %lf %3s", &dbm, unit) == 2 &&
+                strcmp(unit, "dBm") == 0 && dbm >= -127.0 && dbm < 0.0)
+                return (int)(dbm - 0.5);
+        }
+        line = strchr(line, '\n');
+        if (line)
+            line++;
+    }
+    return 0;
+}
+
+static int iw_get_link_signal(const char *device, const uint8_t *bssid)
+{
+    char *argv[] = { "iw", "dev", (char *)device, "link", NULL };
+    char *output = NULL;
+    int signal = 0;
+
+    if (run_command(argv, &output) == 0)
+        signal = iw_parse_signal(output, bssid, true);
+    free(output);
+    return signal;
 }
 
 static bool parse_ipv4(const char *text, uint8_t *addr)
@@ -373,6 +424,22 @@ static enum wifi_status nmcli_get_wifi_device(char *buf, size_t buf_sz)
 
     free(output);
     return WIFI_STATUS_NOT_READY;
+}
+
+/* This command reads the existing kernel scan cache; it does not start a scan. */
+static char *iw_get_scan_cache(void)
+{
+    char device[64];
+    char *argv[] = { "iw", "dev", device, "scan", "dump", NULL };
+    char *output = NULL;
+
+    if (nmcli_get_wifi_device(device, sizeof(device)) != WIFI_STATUS_SUCCESS)
+        return NULL;
+    if (run_command(argv, &output) != 0) {
+        free(output);
+        return NULL;
+    }
+    return output;
 }
 
 static enum wifi_status nmcli_get_active_connection(char *buf, size_t buf_sz)
@@ -761,10 +828,22 @@ enum wifi_status wifi_deinit(void)
         return WIFI_STATUS_SUCCESS;
 
     g_inited = false;
+    g_cb = NULL;
+    g_cb_arg = NULL;
     memset(&g_state, 0, sizeof(g_state));
     free(g_scan_ssid);
     g_scan_ssid = NULL;
     clear_ap_cache();
+    return WIFI_STATUS_SUCCESS;
+}
+
+enum wifi_status wifi_register_msg_cb(wifi_msg_cb_t msg_cb, void *arg)
+{
+    if (!g_inited)
+        return WIFI_STATUS_NOT_READY;
+
+    g_cb = msg_cb;
+    g_cb_arg = msg_cb ? arg : NULL;
     return WIFI_STATUS_SUCCESS;
 }
 
@@ -1035,7 +1114,7 @@ enum wifi_status wifi_sta_get_info(struct wifi_sta_info *info)
             info->ssid[WIFI_SSID_MAX_LEN] = '\0';
             parse_mac(fields[1], info->bssid);
             info->freq = atoi(fields[3]);
-            info->rssi = atoi(fields[4]);
+            info->rssi = iw_get_link_signal(wifi_dev, info->bssid);
             info->sec = parse_security(fields[5]);
             found = true;
             break;
@@ -1379,6 +1458,7 @@ enum wifi_status wifi_get_scan_results(struct wifi_scan_result *result,
     const char *ssid, uint32_t *bss_num, uint32_t arr_size)
 {
     char *output = NULL;
+    char *signal_cache = NULL;
     char *saveptr = NULL;
     char *line;
     char *argv[] = {
@@ -1410,6 +1490,9 @@ enum wifi_status wifi_get_scan_results(struct wifi_scan_result *result,
         return WIFI_STATUS_FAIL;
     }
 
+    if (arr_size > 0)
+        signal_cache = iw_get_scan_cache();
+
     line = strtok_r(output, "\n", &saveptr);
     while (line) {
         rstrip(line);
@@ -1439,7 +1522,7 @@ enum wifi_status wifi_get_scan_results(struct wifi_scan_result *result,
                 strncpy(entry->ssid, fields[1], WIFI_SSID_MAX_LEN);
                 entry->ssid[WIFI_SSID_MAX_LEN] = '\0';
                 entry->freq = (uint32_t)atoi(fields[2]);
-                entry->rssi = atoi(fields[3]);
+                entry->rssi = iw_parse_signal(signal_cache, entry->bssid, false);
                 entry->key_mgmt = parse_security(fields[4]);
                 entry->scan_action = false;
                 stored++;
@@ -1449,6 +1532,7 @@ enum wifi_status wifi_get_scan_results(struct wifi_scan_result *result,
     }
 
     free(output);
+    free(signal_cache);
     *bss_num = total;
     return WIFI_STATUS_SUCCESS;
 }

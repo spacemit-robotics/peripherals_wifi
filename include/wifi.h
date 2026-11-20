@@ -99,7 +99,7 @@ enum wifi_sta_event {
 struct wifi_sta_info {
     int id;
     int freq;
-    int rssi;
+    int rssi; /* dBm; 0 if unavailable. Requires iw for signal queries. */
     uint8_t bssid[6];
     char ssid[WIFI_SSID_MAX_LEN + 1];
     uint8_t mac_addr[6];
@@ -142,7 +142,7 @@ struct wifi_scan_result {
     uint8_t bssid[6];
     char ssid[WIFI_SSID_MAX_LEN + 1];
     uint32_t freq;
-    int rssi;
+    int rssi; /* dBm; 0 if unavailable. Requires iw for signal queries. */
     enum wifi_secure key_mgmt;
     bool scan_action;
 };
@@ -275,7 +275,10 @@ enum wifi_status wifi_ap_get_config(struct wifi_ap_config *config);
 
 /* --- common API --- */
 
-/* register message callback */
+/* Register one callback after wifi_init; NULL unregisters it. The callback is
+ * invoked synchronously by API operations with arg in msg->private_data.
+ * wifi_deinit clears the registration. Serialize calls as for other WiFi APIs.
+ */
 enum wifi_status wifi_register_msg_cb(wifi_msg_cb_t msg_cb, void *arg);
 
 /* set scan parameters */
