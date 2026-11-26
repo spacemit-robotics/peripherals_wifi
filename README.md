@@ -43,6 +43,12 @@ make -j4
 ./test_wifi_demo cb scan
 ```
 
+### 消息回调说明
+- 在 `wifi_init()` 成功后注册消息回调。回调在 API 调用期间同步执行，注册参数通过 `msg->private_data` 传入；传入 `NULL` 回调可注销，`wifi_deinit()` 也会清除注册。各 WiFi API 应串行调用。
+- `cb` 示例选项会在初始化后调用 `wifi_register_msg_cb()`，例如 `./test_wifi_demo cb on station` 会打印 `[cb] dev_status=1`。只保留一个注册回调，重新注册会替换原回调及其参数。
+- 回调消息 `msg` 仅在本次回调期间有效，需要延后使用时复制消息内容；`private_data` 指向调用方对象，注销前应保持有效。回调应尽快返回，避免在回调内重入修改 WiFi 状态。
+- 当前通知来自 WiFi 开关、STA 连接/断开、AP 启用/关闭等 API 操作，不包含 NetworkManager 后台事件订阅；其他程序造成的断网、漫游不会因此自动触发回调。`wifi_sta_disconnect()` 的通知表示断开请求已接受，不保证底层断开过程已完成。
+
 ## 详细使用
 保留，引用到后续的官方文档。
 

@@ -761,10 +761,22 @@ enum wifi_status wifi_deinit(void)
         return WIFI_STATUS_SUCCESS;
 
     g_inited = false;
+    g_cb = NULL;
+    g_cb_arg = NULL;
     memset(&g_state, 0, sizeof(g_state));
     free(g_scan_ssid);
     g_scan_ssid = NULL;
     clear_ap_cache();
+    return WIFI_STATUS_SUCCESS;
+}
+
+enum wifi_status wifi_register_msg_cb(wifi_msg_cb_t msg_cb, void *arg)
+{
+    if (!g_inited)
+        return WIFI_STATUS_NOT_READY;
+
+    g_cb = msg_cb;
+    g_cb_arg = msg_cb ? arg : NULL;
     return WIFI_STATUS_SUCCESS;
 }
 
