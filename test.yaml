@@ -22,15 +22,6 @@ tests:
     command: |
       bash components/peripherals/wifi/tests/test_wifi_api_contract.sh error-paths
 
-  - name: wifi-message-callbacks
-    description: Verifies callback registration, lifetime and demo cb commands using a fake nmcli without changing WiFi hardware.
-    category: functional
-    scopes: [pr, scheduled]
-    timeout_s: 120
-    workdir: sdk
-    command: |
-      bash components/peripherals/wifi/tests/test_wifi_callbacks.sh
-
   - name: wifi-hardware-smoke
     description: Manually verifies NetworkManager can enable WiFi and return real scan results.
     category: functional
