@@ -238,6 +238,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (cmd_index == 2) {
+        ret = wifi_register_msg_cb(wifi_event_cb, NULL);
+        if (ret != WIFI_STATUS_SUCCESS) {
+            printf("wifi_register_msg_cb failed: %d\n", ret);
+            wifi_deinit();
+            return 1;
+        }
+    }
+
     if (strcmp(argv[cmd_index], "scan") == 0) {
         struct wifi_scan_result results[32];
         uint32_t total = 0;

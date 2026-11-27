@@ -275,7 +275,17 @@ enum wifi_status wifi_ap_get_config(struct wifi_ap_config *config);
 
 /* --- common API --- */
 
-/* register message callback */
+/* Register one callback after wifi_init; NULL unregisters it. The callback is
+ * invoked synchronously after successful wifi_on/off, wifi_sta_connect/
+ * wifi_sta_disconnect, and wifi_ap_enable/disable calls, with arg in
+ * msg->private_data. wifi_deinit clears the registration. The library is not
+ * thread-safe: callers must serialize all WiFi API calls; no internal locking
+ * or concurrent-call detection is provided. msg is borrowed for the callback
+ * duration; copy it if needed later. Keep arg alive until every callback using
+ * it has returned. Do not unregister, replace the callback, call wifi_deinit,
+ * or change WiFi state from within the callback. This is not a background
+ * network-state monitor.
+ */
 enum wifi_status wifi_register_msg_cb(wifi_msg_cb_t msg_cb, void *arg);
 
 /* set scan parameters */
